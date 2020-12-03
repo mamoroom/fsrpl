@@ -1,6 +1,14 @@
-FROM google/cloud-sdk:alpine
+FROM node:12
 
-WORKDIR /usr/src/app
-RUN apk add --update --no-cache openjdk8 \
-    && gcloud components update \
-    && gcloud components install cloud-firestore-emulator beta --quiet
+RUN yarn global add firebase-tools && \
+    firebase setup:emulators:firestore && \
+    wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | apt-key add - && \
+    apt update && \
+    apt install -y software-properties-common apt-transport-https && \
+    add-apt-repository -y https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/ && \
+    apt update && \
+    apt install -y adoptopenjdk-11-hotspot
+
+COPY conf/firebase.json .
+
+# CMD [ "firebase", "emulators:start"]

@@ -1,10 +1,11 @@
-version: '2'
+version: "3.7"
 services:
-  firestore:
-    build: .
+  firebase:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
     ports:
-      - '8080:8080'
-    volumes:
-      - .:/usr/src/app
-    working_dir: /usr/src/app
-    command: 'gcloud beta emulators firestore start --host-port=0.0.0.0:8080 --project=fs-test'
+      - 4000:4000 # Emulator Suite UI
+      - 8080:8080 # Cloud Firestore
+    command: bash
+    tty: true

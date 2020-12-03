@@ -15,13 +15,18 @@ type CopyCmd struct {
 	DestinationFirestorePath string `required name:"dest" help:"Destination firestore path. The path containts colleaction's path and document id. Document id allowed wildcard character (*). (e.g. collectionName/docId, collecntionName/*)"`
 	DestinationCredentials   string `optional name:"dest_cred" help:"Set destination firestore's credentail file path."`
 	IsDelete                 bool   `optional default:"false" help:"delete source document data after dump." optional`
+	EmulatorProjectID        string `optional name:"emulators-project-id" help:"Set projectID of firestore emulator."`
 }
 
 // Run is main function
 func (c *CopyCmd) Run(opt *Option) error {
 	Debugf("copy from %v to %v isAnotherFirestore:%v", c.FirestorePath, c.DestinationFirestorePath, len(c.DestinationCredentials) != 0)
 	ctx := context.Background()
-	srcFs, err := NewFirebase(ctx, opt, OptWithCred(c.Credentials))
+	conOpt := OptWithCred(c.Credentials)
+	if len(c.EmulatorProjectID) != 0 {
+		conOpt = OptWithEmulatorProjectID(c.EmulatorProjectID)
+	}
+	srcFs, err := NewFirebase(ctx, opt, conOpt)
 	if err != nil {
 		return err
 	}
