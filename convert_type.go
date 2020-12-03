@@ -2,14 +2,13 @@ package main
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/genproto/googleapis/type/latlng"
 )
-
-const fsTimeLayout = "2006-01-02T15:04:05Z"
 
 // InterpretationEachValueForTime convert string to time.Time
 func (f *Firestore) InterpretationEachValueForTime(mps map[string]interface{}) map[string]interface{} {
@@ -19,24 +18,40 @@ func (f *Firestore) InterpretationEachValueForTime(mps map[string]interface{}) m
 
 		switch v.Kind() {
 		case reflect.String: // for timestamp
-			if tm, err := time.Parse(fsTimeLayout, v.String()); err == nil {
-				mps[k] = tm
+			if tm, isOk := f.assertTimestampType(v.String()); isOk {
+				mps[k] = *tm
 			}
 		case reflect.Map:
 			vi := v.Interface()
 			Debugf("type switch() map for LatLng / DocumentRef %#v", vi)
 			if ms, ok := vi.(map[string]interface{}); ok {
-				if latLng, isOk := f.assertLatLngType(ms); isOk {
-					Debugf("set LatLng %v, %#v", isOk, latLng)
-					mps[k] = latLng
+				Debugf("map value of %#v", ms)
+				// if latLng, isOk := f.assertLatLngType(ms); isOk {
+				// 	Debugf("set LatLng %v, %#v", isOk, latLng)
+				// 	mps[k] = latLng
+				// }
+				// if docRef, isOk := f.assertDocumentRef(ms); isOk {
+				// 	Debugf("set DocumentRef %v, %#v", isOk, docRef)
+				// 	mps[k] = docRef
+				// }
+				convertedMap := make(map[string]interface{})
+				for mk, mv := range ms {
+					if slice, isOk := f.assertSliceType(mv); isOk {
+						Debugf("set key: %s value: %#v", isOk, slice)
+						convertedMap[mk] = slice
+					} else {
+						convertedMap[mk] = mv
+					}
 				}
-				if docRef, isOk := f.assertDocumentRef(ms); isOk {
-					Debugf("set DocumentRef %v, %#v", isOk, docRef)
-					mps[k] = docRef
-				}
+				mps[k] = convertedMap
 			}
 			//	case firestore.DocumentRef:
 			// Debugf("type switch()  docRef %#v", v)
+		case reflect.Slice:
+			if slice, isOk := f.assertSliceType(i); isOk {
+				Debugf("set Slice %v, %#v", isOk, slice)
+				mps[k] = slice
+			}
 		default:
 			Debugf("type switch() %#v", v)
 			mps[k] = i
@@ -107,4 +122,29 @@ func (f *Firestore) assertLatLngType(x map[string]interface{}) (*latlng.LatLng, 
 		}
 	}
 	return latLng, isOnlyLatLngKey && isOnlyIntValue
+}
+
+const fsTimeLayout = "2006-01-02T15:04:05Z"
+
+func (f *Firestore) assertTimestampType(v string) (*time.Time, bool) {
+	if tm, err := time.Parse(fsTimeLayout, v); err == nil {
+		return &tm, true
+	}
+	return nil, false
+}
+
+func (f *Firestore) assertSliceType(v interface{}) ([]interface{}, bool) {
+	if reflect.ValueOf(v).Kind() != reflect.Slice {
+		return nil, false
+	}
+	Debugf("slice before converted: %#v", v)
+	var converted []interface{}
+	s := reflect.ValueOf(v)
+	for i := 0; i < s.Len(); i++ {
+		om := f.InterpretationEachValueForTime(map[string]interface{}{
+			strconv.Itoa(i): s.Index(i).Interface(),
+		})
+		converted = append(converted, om[strconv.Itoa(i)])
+	}
+	return converted, true
 }
